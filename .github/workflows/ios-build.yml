@@ -39,6 +39,17 @@ jobs:
           unzip -q "$ZIP_FILE" -d app-src
           test -f app-src/package.json
           test -f app-src/capacitor.config.ts
+          # Use Capacitor's JSON config to avoid TypeScript loader compatibility issues.
+          rm -f app-src/capacitor.config.ts
+          cat > app-src/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.qoralearn.app",
+            "appName": "QoraLearn",
+            "webDir": "www",
+            "server": { "androidScheme": "https" },
+            "ios": { "contentInset": "automatic", "backgroundColor": "#F7F6F0" }
+          }
+          EOF
 
       - name: Install dependencies and generate iOS project
         working-directory: app-src
