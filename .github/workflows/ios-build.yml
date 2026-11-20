@@ -44,7 +44,16 @@ jobs:
         working-directory: app-src
         run: |
           npm install
-          npm install --save-dev typescript
+          rm -f capacitor.config.ts
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.qoralearn.app",
+            "appName": "QoraLearn",
+            "webDir": "www",
+            "server": { "androidScheme": "https" },
+            "ios": { "contentInset": "automatic", "backgroundColor": "#F7F6F0" }
+          }
+          EOF
           npm run cap:add:ios
           npm run cap:sync
 
