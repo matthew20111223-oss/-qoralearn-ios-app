@@ -1,0 +1,80 @@
+name: QoraLearn iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.zip'
+      - '.github/workflows/ios-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract QoraLearn project
+        run: |
+          ZIP_FILE="$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found in repository root."
+            exit 1
+          fi
+          mkdir app-src
+          unzip -q "$ZIP_FILE" -d app-src
+          test -f app-src/package.json
+          test -f app-src/capacitor.config.ts
+
+      - name: Install dependencies and generate iOS project
+        working-directory: app-src
+        run: |
+          npm install
+          npm run cap:add:ios
+          npm run cap:sync
+
+      - name: Build unsigned iOS app
+        working-directory: app-src
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ../ios-derived \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="$(find ios-derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "Built .app not found."
+            exit 1
+          fi
+          mkdir -p ipa/Payload
+          cp -R "$APP_PATH" ipa/Payload/
+          cd ipa
+          zip -qr ../QoraLearn-unsigned.ipa Payload
+
+      - name: Upload iOS build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QoraLearn-iOS-unsigned-IPA
+          path: QoraLearn-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
